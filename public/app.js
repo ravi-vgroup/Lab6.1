@@ -9,6 +9,8 @@ const connectionStatusDot = document.getElementById('connectionStatusDot');
 const WELCOME_TEXT =
   'Hello! Ask me about inventory or order status. For example: "Check the inventory status of The 3p Fulfilled Snowboard at the Snow City Warehouse location."';
 const MAX_RECONNECT_DELAY_MS = 15000;
+// Tool call/result cards are hidden; set to true to show them for debugging.
+const SHOW_TOOL_CARDS = false;
 
 let activeAssistantBubble = null;
 let currentStreamSource = null;
@@ -93,6 +95,12 @@ function formatToolContent(content) {
 }
 
 function addToolCard(variant, label, bodyText) {
+  if (!SHOW_TOOL_CARDS) {
+    // Still split the reply so text before and after the tool call doesn't run together.
+    activeAssistantBubble = null;
+    return;
+  }
+
   const wrapper = document.createElement('div');
   wrapper.className = `tool-card ${variant}`;
 
