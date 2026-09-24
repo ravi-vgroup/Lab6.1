@@ -22,6 +22,13 @@ Store policy search (RAG)
 - `test/rag.test.js` covers chunking, the ranking math, and the threshold behaviour with synthetic vectors and a fake embedder — no network calls.
 - A Voyage account without a payment method is limited to 3 requests/minute; `embedTexts` waits and retries on 429.
 
+Sales analytics
+
+- `get_sales_summary` takes `startDate`+`endDate` (YYYY-MM-DD, inclusive, UTC) or `days` (last N days including today, default 30), fetches non-cancelled orders for that range and the equal-length prior range via the Admin API, and passes them to `computeSalesSummary` in `src/sales.js`.
+- `computeSalesSummary(currentOrders, previousOrders)` is pure: order count, total revenue (summed in cents), % change vs the prior period (`null` when the prior revenue is zero), and the top 3 products by number of orders. The agent only restates these numbers; it never estimates them.
+- `test/sales.test.js` covers it with plain arrays, no order data or network.
+- Without the `read_all_orders` scope the Admin API only returns the last 60 days of orders.
+
 Notes
 
 - Shopify admin auth is valid in two ways: either a direct `SHOPIFY_ACCESS_TOKEN` (common for custom/private apps), or a `SHOPIFY_AUTH_CODE` exchange using `SHOPIFY_CLIENT_ID` + `SHOPIFY_CLIENT_SECRET`.

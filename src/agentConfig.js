@@ -17,12 +17,13 @@ export const AGENT_OPTIONS = {
     "mcp__shopify-ops__check_order_risk",
     "mcp__shopify-ops__get_order",
     "mcp__shopify-ops__search_store_policies",
+    "mcp__shopify-ops__get_sales_summary",
   ],
 
   systemPrompt: `
 You are a Shopify operations agent.
 
-You have exactly six tools available:
+You have exactly seven tools available:
 
 1. check_inventory_level
    - Read-only inventory lookup.
@@ -55,6 +56,13 @@ You have exactly six tools available:
    - Use it for any question about store policies (privacy, refunds, returns, shipping, terms) or product descriptions.
    - Answer ONLY from the passages it returns, and name the policy you used.
    - If it returns found=false, or the passages it returns don't actually answer the question (e.g. privacy text for a refund question), say the store's policies don't cover that. Never fill the gap from general knowledge.
+
+7. get_sales_summary
+   - Sales analytics: order count, revenue, % change vs the prior period of equal length, top 3 products by order count.
+   - For "last week" / "last 30 days" style questions pass days (7, 30, ...); for explicit dates pass startDate and endDate.
+   - Summarize its numbers in plain language, quoting them exactly. Never estimate, recompute, or invent figures.
+   - Always state the date ranges that were compared (they're UTC).
+   - If revenueChangePercent is null, say the previous period had no revenue so a percentage change can't be computed.
 
 Be concise and factual in your responses.
 `,

@@ -9,6 +9,7 @@ import {
 } from "./tools.js";
 import { requestOrderReview } from "./flow.js";
 import { searchStorePolicies, startPolicyIndex } from "./rag/policyIndex.js";
+import { getSalesSummary } from "./sales.js";
 
 // Chunk and embed the store's policy pages once at startup.
 startPolicyIndex().catch(() => {
@@ -227,6 +228,40 @@ const searchStorePoliciesTool = tool(
   }
 );
 
+const getSalesSummaryTool = tool(
+  "get_sales_summary",
+  "Sales analytics for a date range: order count, total revenue, % change vs the equivalent prior period (null when the prior revenue was zero), and the top 3 products by order count. Pass startDate+endDate (YYYY-MM-DD, inclusive, UTC) or days (the last N days including today; default 30). Requires read_orders.",
+  {
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    days: z.number().int().min(1).max(365).optional(),
+  },
+  async ({ startDate, endDate, days }) => {
+    try {
+      const result = await getSalesSummary({ startDate, endDate, days });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Sales summary failed: ${error.message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
 export const opsServer = createSdkMcpServer({
   name: "shopify-ops",
   version: "1.0.0",
@@ -237,5 +272,6 @@ export const opsServer = createSdkMcpServer({
     checkOrderRiskTool,
     getOrderTool,
     searchStorePoliciesTool,
+    getSalesSummaryTool,
   ],
 });
