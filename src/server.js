@@ -158,6 +158,16 @@ function authenticate(token) {
       shopDomain: SHOPIFY_STORE_DOMAIN,
     });
   } catch (error) {
+    // Log why, plus the unverified routing claims, to debug rejected Admin tokens.
+    // Never log the token itself or the secret.
+    let claims = "";
+    try {
+      const { aud, dest, exp } = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+      claims = ` (aud=${aud}, dest=${dest}, exp=${exp}, now=${Math.floor(Date.now() / 1000)})`;
+    } catch {
+      // Token wasn't decodable; the reason already says so.
+    }
+    console.warn(`Rejected session token: ${error.message}${claims}`);
     return null;
   }
 }
