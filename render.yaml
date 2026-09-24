@@ -20,3 +20,5 @@ services:
         sync: false
       - key: SHOPIFY_CLIENT_SECRET
         sync: false
+      - key: VOYAGE_API_KEY
+        sync: false

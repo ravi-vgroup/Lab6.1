@@ -8,6 +8,12 @@ import {
   updateOrderStatus,
 } from "./tools.js";
 import { requestOrderReview } from "./flow.js";
+import { searchStorePolicies, startPolicyIndex } from "./rag/policyIndex.js";
+
+// Chunk and embed the store's policy pages once at startup.
+startPolicyIndex().catch(() => {
+  // Already logged; search_store_policies retries the build on first use.
+});
 
 const checkInventoryTool = tool(
   "check_inventory_level",
@@ -189,6 +195,38 @@ const getOrderTool = tool(
   }
 );
 
+const searchStorePoliciesTool = tool(
+  "search_store_policies",
+  "Search the store's policy pages (privacy, refund, shipping, terms) and product descriptions. Returns the most relevant passages, or found=false when nothing matches closely enough.",
+  {
+    question: z.string().min(1),
+  },
+  async ({ question }) => {
+    try {
+      const result = await searchStorePolicies(question);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Policy search failed: ${error.message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
 export const opsServer = createSdkMcpServer({
   name: "shopify-ops",
   version: "1.0.0",
@@ -198,5 +236,6 @@ export const opsServer = createSdkMcpServer({
     requestOrderReviewTool,
     checkOrderRiskTool,
     getOrderTool,
+    searchStorePoliciesTool,
   ],
 });

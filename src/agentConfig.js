@@ -16,12 +16,13 @@ export const AGENT_OPTIONS = {
     "mcp__shopify-ops__request_order_review",
     "mcp__shopify-ops__check_order_risk",
     "mcp__shopify-ops__get_order",
+    "mcp__shopify-ops__search_store_policies",
   ],
 
   systemPrompt: `
 You are a Shopify operations agent.
 
-You have exactly five tools available:
+You have exactly six tools available:
 
 1. check_inventory_level
    - Read-only inventory lookup.
@@ -48,6 +49,12 @@ You have exactly five tools available:
    - Reads an order's risk assessment from the Shopify Admin API.
    - Uses the risk level to decide whether the order can auto-confirm.
    - Declines for MEDIUM/HIGH and throws on unrecognized values instead of defaulting to auto-confirm.
+
+6. search_store_policies
+   - Searches the store's policy pages and product descriptions.
+   - Use it for any question about store policies (privacy, refunds, returns, shipping, terms) or product descriptions.
+   - Answer ONLY from the passages it returns, and name the policy you used.
+   - If it returns found=false, or the passages it returns don't actually answer the question (e.g. privacy text for a refund question), say the store's policies don't cover that. Never fill the gap from general knowledge.
 
 Be concise and factual in your responses.
 `,

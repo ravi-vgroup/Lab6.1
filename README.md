@@ -15,6 +15,13 @@ Setup
    - `npm run ui` — embedded mode. Every API route requires a Shopify App Bridge session token, so the chat only works when opened from Shopify Admin (unauthenticated requests get 401).
    - `npm run ui:local` — for a plain local browser tab. Token-less requests from this machine (loopback only) are allowed; it refuses to start on Render. Use `PORT=3001` if 3000 is busy.
 
+Store policy search (RAG)
+
+- At startup the store's policy pages (Admin API `shop.shopPolicies`) and product descriptions are chunked (`src/rag/chunk.js`), embedded once with Voyage AI (`src/rag/embed.js`, needs `VOYAGE_API_KEY`), and held in memory.
+- The `search_store_policies` tool embeds the question with the same function, ranks chunks by cosine similarity (`src/rag/similarity.js`), and returns the top 3 that score at least `RAG_MIN_SCORE` (default 0.45). Below that it returns `found: false` and the agent says the policies don't cover it instead of guessing.
+- `test/rag.test.js` covers chunking, the ranking math, and the threshold behaviour with synthetic vectors and a fake embedder — no network calls.
+- A Voyage account without a payment method is limited to 3 requests/minute; `embedTexts` waits and retries on 429.
+
 Notes
 
 - Shopify admin auth is valid in two ways: either a direct `SHOPIFY_ACCESS_TOKEN` (common for custom/private apps), or a `SHOPIFY_AUTH_CODE` exchange using `SHOPIFY_CLIENT_ID` + `SHOPIFY_CLIENT_SECRET`.
