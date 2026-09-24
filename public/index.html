@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Replaced server-side with SHOPIFY_CLIENT_ID. -->
+    <meta name="shopify-api-key" content="%SHOPIFY_API_KEY%" />
+    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+    <title>Shopify Ops Agent</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Admin</p>
+          <h1>Shopify Ops Agent</h1>
+        </div>
+        <div class="header-actions">
+          <div class="connection-status" aria-live="polite">
+            <span id="connectionStatusDot" class="status-dot"></span>
+            <span id="connectionStatusText">Connecting...</span>
+          </div>
+          <button id="newChatBtn" class="secondary-btn" type="button">New chat</button>
+        </div>
+      </header>
+
+      <main class="chat-panel">
+        <div id="messages" class="messages" aria-live="polite">
+          <div class="message bot">
+            <div class="bubble">
+              Hello! Ask me about inventory or order status. For example: "Check the inventory status of The 3p Fulfilled Snowboard at the Snow City Warehouse location."
+            </div>
+          </div>
+        </div>
+
+        <form id="chatForm" class="composer">
+          <textarea
+            id="messageInput"
+            rows="3"
+            placeholder="Ask the Shopify agent..."
+            aria-label="Ask the Shopify agent"
+          ></textarea>
+          <div class="composer-actions">
+            <button id="sendBtn" type="submit">Send</button>
+          </div>
+        </form>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

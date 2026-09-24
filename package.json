@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "node --test",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "demo": "node src/demo-server.js",
+    "ui": "node src/server.js"
   },
   "keywords": [],
   "author": "",

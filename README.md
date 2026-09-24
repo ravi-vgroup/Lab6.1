@@ -14,6 +14,14 @@ Setup
 
 Notes
 
-- The Shopify client exchanges `client_id`/`client_secret` for an access token and caches it in memory until shortly before expiry.
+- Shopify admin auth is valid in two ways: either a direct `SHOPIFY_ACCESS_TOKEN` (common for custom/private apps), or a `SHOPIFY_AUTH_CODE` exchange using `SHOPIFY_CLIENT_ID` + `SHOPIFY_CLIENT_SECRET`.
+- The old `grant_type=client_credentials` request to `/admin/oauth/access_token` is not valid for Shopify admin OAuth and is the source of the `Missing or invalid client secret` error.
 - Name-matching (product/location) is separated from network calls and covered by unit tests.
 - The agent explicitly allows only the two tools listed; no other built-in tools are exposed.
+
+Governed Flow action layer
+
+- For writes that should be governed by a Shopify Flow workflow, the app exposes a `request_order_review` tool that calls the Shopify Admin GraphQL `flowTriggerReceive` mutation.
+- The Flow trigger handle should match the deployed trigger extension, for example `order-review-requested`.
+- This pattern is useful when you want validation, retries, and workflow controls to live in Shopify Flow rather than in your agent code.
+- The trigger payload can carry simple fields like `order_id` and `reason`, which the workflow can inspect before performing the actual action.

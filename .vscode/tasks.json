@@ -1,0 +1,47 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "verify shell",
+			"type": "shell",
+			"command": "echo hello",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "syntax-check",
+			"type": "shell",
+			"command": "node --check src/index.js && node --check src/demo-server.js",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "cli-order-check",
+			"type": "shell",
+			"command": "echo \"i need to order detail for this order id:- 7183570567204\" | node src/index.js",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "verify-order-flow",
+			"type": "shell",
+			"command": "node --check src/index.js && node --check src/demo-server.js && node --check src/tools.js && echo \"i need to order detail for this order id:- 7183570567204\" | node src/index.js",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "full-verify",
+			"type": "shell",
+			"command": "npm test -- --test-reporter=spec && echo \"i need to order detail for this order id:- 7183570567204\" | node src/index.js",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "inventory-check",
+			"type": "shell",
+			"command": "echo \"i want to know the inventory status of The 3p Fulfilled Snowboard at the Snow City Warehouse location.\" | node src/index.js",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

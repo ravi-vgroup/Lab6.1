@@ -1,22 +1,44 @@
 import "dotenv/config";
 
-const {
-  SHOPIFY_STORE_DOMAIN,
-  SHOPIFY_CLIENT_ID,
-  SHOPIFY_CLIENT_SECRET,
-} = process.env;
-
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
+function getShopifyEnv() {
+  return {
+    SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN,
+    SHOPIFY_CLIENT_ID: process.env.SHOPIFY_CLIENT_ID,
+    SHOPIFY_CLIENT_SECRET: process.env.SHOPIFY_CLIENT_SECRET,
+    SHOPIFY_ACCESS_TOKEN: process.env.SHOPIFY_ACCESS_TOKEN,
+    SHOPIFY_AUTH_CODE: process.env.SHOPIFY_AUTH_CODE,
+  };
+}
+
 /**
- * Get Shopify Admin API access token using
- * OAuth client_credentials grant.
+ * Shopify supports two valid admin auth patterns:
+ * 1) a direct access token (for custom/private apps), or
+ * 2) an OAuth authorization code exchange using client_id + client_secret.
+ *
+ * The previous client_credentials flow is not valid for the admin OAuth endpoint
+ * and causes the exact "Missing or invalid client secret" failure seen here.
  */
 export async function getAccessToken() {
-  // Validate env when the client is actually used (avoid throwing at import time)
+  const {
+    SHOPIFY_STORE_DOMAIN,
+    SHOPIFY_CLIENT_ID,
+    SHOPIFY_CLIENT_SECRET,
+    SHOPIFY_ACCESS_TOKEN,
+    SHOPIFY_AUTH_CODE,
+  } = getShopifyEnv();
+
   if (!SHOPIFY_STORE_DOMAIN) {
     throw new Error("Missing SHOPIFY_STORE_DOMAIN in .env");
+  }
+
+  // Prefer a direct access token when it is configured; this avoids the OAuth exchange.
+  if (SHOPIFY_ACCESS_TOKEN) {
+    cachedToken = SHOPIFY_ACCESS_TOKEN;
+    tokenExpiresAt = Number.MAX_SAFE_INTEGER;
+    return cachedToken;
   }
 
   if (!SHOPIFY_CLIENT_ID) {
@@ -25,6 +47,12 @@ export async function getAccessToken() {
 
   if (!SHOPIFY_CLIENT_SECRET) {
     throw new Error("Missing SHOPIFY_CLIENT_SECRET in .env");
+  }
+
+  if (!SHOPIFY_AUTH_CODE) {
+    throw new Error(
+      "Missing SHOPIFY_AUTH_CODE in .env. Set SHOPIFY_ACCESS_TOKEN for a direct token or provide the OAuth authorization code."
+    );
   }
 
   // Reuse cached token until shortly before expiry
@@ -40,9 +68,9 @@ export async function getAccessToken() {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
-        grant_type: "client_credentials",
         client_id: SHOPIFY_CLIENT_ID,
         client_secret: SHOPIFY_CLIENT_SECRET,
+        code: SHOPIFY_AUTH_CODE,
       }),
     }
   );
@@ -57,7 +85,7 @@ export async function getAccessToken() {
   const data = await response.json();
 
   cachedToken = data.access_token;
-  tokenExpiresAt = Date.now() + data.expires_in * 1000;
+  tokenExpiresAt = Date.now() + (Number(data.expires_in) || 3600) * 1000;
 
   return cachedToken;
 }
@@ -66,9 +94,12 @@ export async function getAccessToken() {
  * Execute a Shopify Admin GraphQL query.
  */
 export async function shopifyGraphQL(query, variables = {}) {
+  const { SHOPIFY_STORE_DOMAIN } = getShopifyEnv();
+
   if (!SHOPIFY_STORE_DOMAIN) {
     throw new Error("Missing SHOPIFY_STORE_DOMAIN in .env");
   }
+
   const response = await fetch(
     `https://${SHOPIFY_STORE_DOMAIN}/admin/api/2025-10/graphql.json`,
     {

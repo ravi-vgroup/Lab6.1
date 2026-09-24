@@ -1,6 +1,29 @@
 import { shopifyGraphQL } from "./shopify.js";
 import { requireApproval } from "./approval.js";
 
+export function normalizeOrderId(orderId) {
+  const value = String(orderId ?? "").trim();
+
+  if (!value) {
+    throw new Error("orderId is required.");
+  }
+
+  if (value.startsWith("gid://shopify/Order/")) {
+    return value;
+  }
+
+  if (/^\d+$/.test(value)) {
+    return `gid://shopify/Order/${value}`;
+  }
+
+  const match = value.match(/gid:\/\/shopify\/Order\/(\d+)/);
+  if (match) {
+    return `gid://shopify/Order/${match[1]}`;
+  }
+
+  return value;
+}
+
 /**
  * Pick a product from Shopify results.
  *
@@ -31,11 +54,15 @@ export function pickProductMatch(products, productName) {
   }
 
   if (substringMatches.length === 0) {
-    throw new Error(`No product found matching "${productName}".`);
+    const available = products.map((product) => product.title).slice(0, 10);
+    throw new Error(
+      `No product found matching "${productName}". Available products: ${available.join(", ") || "none"}.`
+    );
   }
 
+  const available = substringMatches.map((product) => product.title).slice(0, 10);
   throw new Error(
-    `Multiple products found matching "${productName}". Please use the exact product name.`
+    `Multiple products found matching "${productName}". Please use the exact product name. Similar matches: ${available.join(", ")}.`
   );
 }
 
@@ -69,11 +96,15 @@ export function pickLocationMatch(locations, locationName) {
   }
 
   if (substringMatches.length === 0) {
-    throw new Error(`No location found matching "${locationName}".`);
+    const available = locations.map((location) => location.name).slice(0, 10);
+    throw new Error(
+      `No location found matching "${locationName}". Available locations: ${available.join(", ") || "none"}.`
+    );
   }
 
+  const available = substringMatches.map((location) => location.name).slice(0, 10);
   throw new Error(
-    `Multiple locations found matching "${locationName}". Please use the exact location name.`
+    `Multiple locations found matching "${locationName}". Please use the exact location name. Similar matches: ${available.join(", ")}.`
   );
 }
 
@@ -216,9 +247,7 @@ export async function updateOrderStatus({
     confirmed,
   });
 
-  if (!orderId?.trim()) {
-    throw new Error("orderId is required.");
-  }
+  const normalizedOrderId = normalizeOrderId(orderId);
 
   const allowedActions = ["close", "reopen", "cancel"];
 
@@ -250,7 +279,7 @@ export async function updateOrderStatus({
     `;
 
     variables = {
-      id: orderId,
+      id: normalizedOrderId,
     };
   }
 
@@ -273,7 +302,7 @@ export async function updateOrderStatus({
     `;
 
     variables = {
-      id: orderId,
+      id: normalizedOrderId,
     };
   }
 
@@ -299,7 +328,7 @@ export async function updateOrderStatus({
     `;
 
     variables = {
-      id: orderId,
+      id: normalizedOrderId,
     };
   }
 
@@ -326,7 +355,125 @@ export async function updateOrderStatus({
   return {
     success: true,
     action,
-    orderId,
+    orderId: normalizedOrderId,
     result,
+  };
+}
+
+export function shouldAutoConfirm(riskLevel) {
+  const normalized = String(riskLevel ?? "").trim().toUpperCase();
+
+  if (normalized === "LOW") {
+    return { autoConfirm: true, reason: null };
+  }
+
+  if (normalized === "MEDIUM") {
+    return { autoConfirm: false, reason: "flagged for manual review" };
+  }
+
+  if (normalized === "HIGH") {
+    return { autoConfirm: false, reason: "held - high risk" };
+  }
+
+  throw new Error(`Unrecognized risk level: "${riskLevel}".`);
+}
+
+export async function checkOrderRisk({ orderId }) {
+  if (!orderId?.trim()) {
+    throw new Error("orderId is required.");
+  }
+
+  const normalizedOrderId = normalizeOrderId(orderId);
+  const data = await shopifyGraphQL(
+    `
+      query GetOrderRisk($id: ID!) {
+        order(id: $id) {
+          id
+          riskLevel
+        }
+      }
+    `,
+    {
+      id: normalizedOrderId,
+    }
+  );
+
+  const order = data?.order;
+  const riskLevel = order?.riskLevel ?? order?.risk?.level ?? order?.risk?.riskLevel;
+
+  if (riskLevel === undefined || riskLevel === null) {
+    throw new Error(`No risk assessment returned for order ${normalizedOrderId}.`);
+  }
+
+  const decision = shouldAutoConfirm(riskLevel);
+
+  return {
+    orderId: normalizedOrderId,
+    riskLevel,
+    autoConfirm: decision.autoConfirm,
+    reason: decision.reason,
+  };
+}
+
+export async function getOrderDetails({ orderId }) {
+  if (!orderId?.trim()) {
+    throw new Error("orderId is required.");
+  }
+
+  const normalizedOrderId = normalizeOrderId(orderId);
+  const data = await shopifyGraphQL(
+    `
+      query GetOrder($id: ID!) {
+        order(id: $id) {
+          id
+          name
+          displayFinancialStatus
+          displayFulfillmentStatus
+          totalPrice
+          subtotalPrice
+          totalTax
+          currencyCode
+          customer {
+            firstName
+            lastName
+            email
+          }
+          lineItems(first: 50) {
+            nodes {
+              title
+              quantity
+              variant {
+                id
+                title
+              }
+            }
+          }
+        }
+      }
+    `,
+    {
+      id: normalizedOrderId,
+    }
+  );
+
+  if (!data?.order) {
+    throw new Error(`No order found for ${normalizedOrderId}.`);
+  }
+
+  return {
+    id: data.order.id,
+    name: data.order.name,
+    displayFinancialStatus: data.order.displayFinancialStatus,
+    displayFulfillmentStatus: data.order.displayFulfillmentStatus,
+    totalPrice: data.order.totalPrice,
+    subtotalPrice: data.order.subtotalPrice,
+    totalTax: data.order.totalTax,
+    currencyCode: data.order.currencyCode,
+    customer: data.order.customer,
+    lineItems: (data.order.lineItems?.nodes ?? []).map((node) => ({
+      title: node.title,
+      quantity: node.quantity,
+      variant: node.variant,
+    })),
   };
 }
