@@ -21,23 +21,35 @@ function setConnectionStatus(state, connected) {
   connectionStatusDot.classList.toggle('connected', connected);
 }
 
+// Outside the Admin iframe there is no App Bridge; the server only accepts that
+// when started with `npm run ui:local`.
+const isEmbedded = window.top !== window.self;
+const UNAUTHORIZED_HINT = isEmbedded
+  ? 'Unauthorized: the session token was rejected.'
+  : 'Unauthorized. Open this app from Shopify Admin, or run `npm run ui:local` to use it in a local browser tab.';
+
 // App Bridge session tokens are short-lived, so fetch a fresh one before every request.
+// Resolves to null when running outside Admin.
 async function getSessionToken() {
-  if (!window.shopify || typeof window.shopify.idToken !== 'function') {
-    throw new Error('App Bridge is unavailable. Open this app from Shopify Admin.');
+  if (!isEmbedded || !window.shopify || typeof window.shopify.idToken !== 'function') {
+    return null;
   }
   return window.shopify.idToken();
 }
 
 async function authorizedFetch(url, options = {}) {
   const token = await getSessionToken();
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers: {
       ...options.headers,
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+  if (response.status === 401) {
+    throw new Error(UNAUTHORIZED_HINT);
+  }
+  return response;
 }
 
 function scrollToBottom() {
@@ -130,18 +142,19 @@ async function connectStream() {
   try {
     token = await getSessionToken();
   } catch (error) {
-    setConnectionStatus(error.message, false);
+    setConnectionStatus(`Session token error: ${error.message}`, false);
+    scheduleReconnect();
     return;
   }
 
-  const source = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
+  const source = new EventSource(token ? `/api/events?token=${encodeURIComponent(token)}` : '/api/events');
   currentStreamSource = source;
 
   source.addEventListener('status', (event) => {
     const payload = JSON.parse(event.data);
     if (payload.state === 'connected') {
       reconnectDelayMs = 1000;
-      setConnectionStatus('Connected', true);
+      setConnectionStatus(isEmbedded ? 'Connected' : 'Connected (local mode)', true);
     }
   });
 
@@ -180,7 +193,10 @@ async function connectStream() {
     }
     source.close();
     currentStreamSource = null;
-    setConnectionStatus('Disconnected. Reconnecting...', false);
+    setConnectionStatus(
+      isEmbedded ? 'Disconnected. Reconnecting...' : 'Not connected. Run `npm run ui:local` for local use. Retrying...',
+      false,
+    );
     scheduleReconnect();
   };
 }

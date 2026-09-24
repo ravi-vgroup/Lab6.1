@@ -11,6 +11,9 @@ Setup
 2. Install dependencies: `npm install`.
 3. Run tests: `npm test` (uses `node --test`).
 4. Run the CLI: `npm start`.
+5. Run the web chat UI:
+   - `npm run ui` — embedded mode. Every API route requires a Shopify App Bridge session token, so the chat only works when opened from Shopify Admin (unauthenticated requests get 401).
+   - `npm run ui:local` — for a plain local browser tab. Token-less requests from this machine (loopback only) are allowed; it refuses to start on Render. Use `PORT=3001` if 3000 is busy.
 
 Notes
 

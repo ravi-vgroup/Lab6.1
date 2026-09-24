@@ -24,6 +24,14 @@ if (!SHOPIFY_CLIENT_ID || !SHOPIFY_CLIENT_SECRET || !SHOPIFY_STORE_DOMAIN) {
   );
 }
 
+// `npm run ui:local`: lets a plain browser tab on this machine use the chat without
+// App Bridge. Only token-less requests from loopback are let through; never on Render.
+const LOCAL_DEV_AUTH = process.argv.includes("--local-dev");
+
+if (LOCAL_DEV_AUTH && process.env.RENDER) {
+  throw new Error("--local-dev must not be used on a deployed server.");
+}
+
 // Shopify Admin refuses to iframe the app without this.
 const FRAME_ANCESTORS_CSP = "frame-ancestors https://admin.shopify.com https://*.myshopify.com;";
 
@@ -150,7 +158,16 @@ function resetSession() {
 // Auth
 // ---------------------------------------------------------------------------
 
-function authenticate(token) {
+function isLoopback(req) {
+  const address = req.socket.remoteAddress || "";
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
+function authenticate(req, token) {
+  if (!token && LOCAL_DEV_AUTH && isLoopback(req)) {
+    return { local: true };
+  }
+
   try {
     return verifySessionToken(token, {
       clientId: SHOPIFY_CLIENT_ID,
@@ -266,7 +283,7 @@ async function readJsonBody(req, limitBytes = 64 * 1024) {
 // ---------------------------------------------------------------------------
 
 function handleEvents(req, res, url) {
-  if (!authenticate(url.searchParams.get("token") || "")) {
+  if (!authenticate(req, url.searchParams.get("token") || "")) {
     sendJson(res, 401, { error: "Unauthorized" });
     return;
   }
@@ -289,7 +306,7 @@ function handleEvents(req, res, url) {
 }
 
 async function handleMessage(req, res) {
-  if (!authenticate(bearerToken(req))) {
+  if (!authenticate(req, bearerToken(req))) {
     sendJson(res, 401, { error: "Unauthorized" });
     return;
   }
@@ -306,7 +323,7 @@ async function handleMessage(req, res) {
 }
 
 function handleReset(req, res) {
-  if (!authenticate(bearerToken(req))) {
+  if (!authenticate(req, bearerToken(req))) {
     sendJson(res, 401, { error: "Unauthorized" });
     return;
   }
@@ -350,4 +367,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, () => {
   console.log(`Shopify Ops UI is running at http://localhost:${server.address().port}`);
+  if (LOCAL_DEV_AUTH) {
+    console.log("Local dev auth ON: token-less requests from this machine are allowed.");
+  }
 });

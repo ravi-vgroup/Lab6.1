@@ -7,7 +7,8 @@
     "test": "node --test",
     "start": "node src/index.js",
     "demo": "node src/demo-server.js",
-    "ui": "node src/server.js"
+    "ui": "node src/server.js",
+    "ui:local": "node src/server.js --local-dev"
   },
   "keywords": [],
   "author": "",
