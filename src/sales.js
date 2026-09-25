@@ -3,6 +3,7 @@ import { shopifyGraphQL } from "./shopify.js";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 250;
 const MAX_PAGES = 20;
+const MAX_RANGE_DAYS = 366;
 
 // Sum money in integer cents so 0.1 + 0.2 style float drift can't creep into totals.
 function toCents(amount) {
@@ -10,7 +11,35 @@ function toCents(amount) {
 }
 
 /**
- * Pure sales summary. Orders are { totalPrice: number, lineItems: [{ productId?, title }] }.
+ * Pure ranking of every product by the number of orders containing it (an order
+ * with 5 of an item counts once), with units summed from line-item quantities.
+ * Ties break alphabetically. Returns [{ title, orderCount, units }].
+ */
+export function rankProducts(orders) {
+  const products = new Map();
+  for (const order of orders) {
+    const seenInOrder = new Set();
+    for (const item of order.lineItems ?? []) {
+      const key = item.productId ?? item.title;
+      const entry = products.get(key) ?? { title: item.title, orderCount: 0, units: 0 };
+      entry.units += Number(item.quantity ?? 1);
+      if (!seenInOrder.has(key)) {
+        seenInOrder.add(key);
+        entry.orderCount += 1;
+      }
+      products.set(key, entry);
+    }
+  }
+
+  return [...products.values()].sort((a, b) => b.orderCount - a.orderCount || a.title.localeCompare(b.title));
+}
+
+function averageCents(totalCents, count) {
+  return count === 0 ? null : Math.round(totalCents / count) / 100;
+}
+
+/**
+ * Pure sales summary. Orders are { totalPrice: number, lineItems: [{ productId?, title, quantity? }] }.
  * Returns current revenue, % change vs the previous period (null when the previous
  * revenue is zero), and the top 3 products by number of orders containing them.
  */
@@ -23,30 +52,17 @@ export function computeSalesSummary(currentOrders, previousOrders) {
       ? null
       : Math.round(((revenueCents - previousRevenueCents) / previousRevenueCents) * 10000) / 100;
 
-  // Count orders per product, not units: an order with 5 of an item counts once.
-  const products = new Map();
-  for (const order of currentOrders) {
-    const seenInOrder = new Set();
-    for (const item of order.lineItems ?? []) {
-      const key = item.productId ?? item.title;
-      if (seenInOrder.has(key)) continue;
-      seenInOrder.add(key);
-
-      const entry = products.get(key) ?? { title: item.title, orderCount: 0 };
-      entry.orderCount += 1;
-      products.set(key, entry);
-    }
-  }
-
-  const topProducts = [...products.values()]
-    .sort((a, b) => b.orderCount - a.orderCount || a.title.localeCompare(b.title))
-    .slice(0, 3);
+  const topProducts = rankProducts(currentOrders)
+    .slice(0, 3)
+    .map(({ title, orderCount }) => ({ title, orderCount }));
 
   return {
     orderCount: currentOrders.length,
     totalRevenue: revenueCents / 100,
+    averageOrderValue: averageCents(revenueCents, currentOrders.length),
     previousOrderCount: previousOrders.length,
     previousRevenue: previousRevenueCents / 100,
+    previousAverageOrderValue: averageCents(previousRevenueCents, previousOrders.length),
     revenueChangePercent,
     topProducts,
   };
@@ -82,6 +98,9 @@ export function resolvePeriods({ startDate, endDate, days, today = new Date() })
   }
 
   const lengthDays = Math.round((end - start) / DAY_MS) + 1;
+  if (lengthDays > MAX_RANGE_DAYS) {
+    throw new Error(`Date range can be at most ${MAX_RANGE_DAYS} days.`);
+  }
   const previousEnd = new Date(start.getTime() - DAY_MS);
   const previousStart = new Date(previousEnd.getTime() - (lengthDays - 1) * DAY_MS);
   const iso = (date) => date.toISOString().slice(0, 10);
@@ -107,9 +126,11 @@ async function fetchOrders({ startDate, endDate }) {
       query SalesOrders($query: String!, $after: String) {
         orders(first: ${PAGE_SIZE}, after: $after, query: $query) {
           nodes {
+            name
+            createdAt
             cancelledAt
             currentTotalPriceSet { shopMoney { amount currencyCode } }
-            lineItems(first: 100) { nodes { title product { id } } }
+            lineItems(first: 100) { nodes { title quantity product { id } } }
           }
           pageInfo { hasNextPage endCursor }
         }
@@ -121,11 +142,14 @@ async function fetchOrders({ startDate, endDate }) {
     for (const order of data.orders.nodes) {
       if (order.cancelledAt) continue;
       orders.push({
+        name: order.name,
+        createdAt: order.createdAt,
         totalPrice: Number(order.currentTotalPriceSet.shopMoney.amount),
         currencyCode: order.currentTotalPriceSet.shopMoney.currencyCode,
         lineItems: order.lineItems.nodes.map((item) => ({
           productId: item.product?.id ?? null,
           title: item.title,
+          quantity: item.quantity,
         })),
       });
     }
@@ -139,21 +163,35 @@ async function fetchOrders({ startDate, endDate }) {
   return { orders, truncated: true };
 }
 
-/** Fetch real orders for the range and the equivalent prior range, then summarize them. */
-export async function getSalesSummary({ startDate, endDate, days } = {}) {
+/**
+ * Fetch real orders for the range and the equivalent prior range. The agent tool,
+ * the dashboard and the Excel export all build on this, so their numbers agree.
+ */
+export async function loadSalesReport({ startDate, endDate, days } = {}) {
   const periods = resolvePeriods({ startDate, endDate, days });
   const [current, previous] = await Promise.all([fetchOrders(periods.current), fetchOrders(periods.previous)]);
 
   const currencies = new Set([...current.orders, ...previous.orders].map((order) => order.currencyCode));
+  const truncated = current.truncated || previous.truncated;
 
   return {
-    currentPeriod: periods.current,
-    previousPeriod: periods.previous,
-    timezone: "UTC",
-    currency: currencies.size === 1 ? [...currencies][0] : currencies.size === 0 ? null : [...currencies],
-    ...computeSalesSummary(current.orders, previous.orders),
-    ...(current.truncated || previous.truncated
-      ? { warning: `More than ${PAGE_SIZE * MAX_PAGES} orders in a period; totals cover only the first ${PAGE_SIZE * MAX_PAGES}.` }
-      : {}),
+    summary: {
+      currentPeriod: periods.current,
+      previousPeriod: periods.previous,
+      timezone: "UTC",
+      currency: currencies.size === 1 ? [...currencies][0] : currencies.size === 0 ? null : [...currencies],
+      ...computeSalesSummary(current.orders, previous.orders),
+      ...(truncated
+        ? { warning: `More than ${PAGE_SIZE * MAX_PAGES} orders in a period; totals cover only the first ${PAGE_SIZE * MAX_PAGES}.` }
+        : {}),
+    },
+    products: rankProducts(current.orders),
+    currentOrders: current.orders,
+    previousOrders: previous.orders,
   };
+}
+
+/** Fetch real orders for the range and the equivalent prior range, then summarize them. */
+export async function getSalesSummary(range = {}) {
+  return (await loadSalesReport(range)).summary;
 }

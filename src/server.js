@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
 import { AGENT_OPTIONS } from "./agentConfig.js";
+import { loadSalesReport, resolvePeriods } from "./sales.js";
+import { buildSalesWorkbook, salesReportFilename } from "./salesExport.js";
 import { verifySessionToken } from "./verifySessionToken.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -332,6 +334,59 @@ function handleReset(req, res) {
   sendJson(res, 200, { ok: true });
 }
 
+// ?days=N or ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD, same as the get_sales_summary tool.
+function salesRangeFromQuery(url) {
+  const { searchParams } = url;
+  const range = {};
+  if (searchParams.get("startDate")) range.startDate = searchParams.get("startDate");
+  if (searchParams.get("endDate")) range.endDate = searchParams.get("endDate");
+  if (searchParams.get("days")) range.days = Number(searchParams.get("days"));
+  return range;
+}
+
+async function loadSalesReportOr400(res, url) {
+  const range = salesRangeFromQuery(url);
+  try {
+    resolvePeriods(range);
+  } catch (error) {
+    sendJson(res, 400, { error: error.message });
+    return null;
+  }
+  return loadSalesReport(range);
+}
+
+async function handleSalesSummary(req, res, url) {
+  if (!authenticate(req, bearerToken(req))) {
+    sendJson(res, 401, { error: "Unauthorized" });
+    return;
+  }
+
+  const report = await loadSalesReportOr400(res, url);
+  if (!report) return;
+  sendJson(res, 200, { ...report.summary, products: report.products.slice(0, 10) });
+}
+
+// The Excel download accepts the token as a Bearer header (fetch) or ?token= (a plain
+// link opened from the Admin iframe, which can't set headers).
+async function handleSalesExport(req, res, url) {
+  if (!authenticate(req, bearerToken(req) || url.searchParams.get("token") || "")) {
+    sendJson(res, 401, { error: "Unauthorized" });
+    return;
+  }
+
+  const report = await loadSalesReportOr400(res, url);
+  if (!report) return;
+
+  const workbook = buildSalesWorkbook(report, { storeDomain: SHOPIFY_STORE_DOMAIN });
+  res.writeHead(200, {
+    "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "Content-Disposition": `attachment; filename="${salesReportFilename(report.summary)}"`,
+    "Content-Length": workbook.length,
+    "Cache-Control": "no-store",
+  });
+  res.end(workbook);
+}
+
 const server = http.createServer(async (req, res) => {
   // Route on the path only: Admin appends ?shop=&host=&embedded=1 to the document request.
   const url = new URL(req.url, "http://localhost");
@@ -344,6 +399,10 @@ const server = http.createServer(async (req, res) => {
       await handleMessage(req, res);
     } else if (req.method === "POST" && pathname === "/api/reset") {
       handleReset(req, res);
+    } else if (req.method === "GET" && pathname === "/api/sales/summary") {
+      await handleSalesSummary(req, res, url);
+    } else if (req.method === "GET" && pathname === "/api/sales/export") {
+      await handleSalesExport(req, res, url);
     } else if (req.method === "GET" && pathname === "/api/health") {
       sendJson(res, 200, { ok: true });
     } else if (pathname.startsWith("/api/")) {

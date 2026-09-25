@@ -28,6 +28,8 @@ Sales analytics
 - `computeSalesSummary(currentOrders, previousOrders)` is pure: order count, total revenue (summed in cents), % change vs the prior period (`null` when the prior revenue is zero), and the top 3 products by number of orders. The agent only restates these numbers; it never estimates them.
 - `test/sales.test.js` covers it with plain arrays, no order data or network.
 - Without the `read_all_orders` scope the Admin API only returns the last 60 days of orders.
+- The web UI has a **Sales analytics** tab (deep link: `/#sales`) with date presets, KPI cards, top products and a current-vs-previous comparison, plus a **Download Excel** button. After the agent answers a sales question, the chat also offers "Download Excel" for that exact range.
+- `GET /api/sales/summary` (Bearer token) and `GET /api/sales/export` (Bearer or `?token=`, because the Admin iframe opens the file as a plain link) take `days` or `startDate`+`endDate`. The export is an .xlsx with Summary, Top products, Orders and Previous period orders sheets, written by the dependency-free `src/xlsx.js`.
 
 Notes
 

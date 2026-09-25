@@ -169,6 +169,14 @@ h1 {
   border: 1px solid #dfe9ff;
 }
 
+.bubble code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(13, 110, 253, 0.08);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.92em;
+}
+
 .message.user .bubble {
   background: var(--user);
   color: white;
@@ -256,13 +264,495 @@ textarea:focus {
   justify-content: flex-end;
 }
 
+/* ---------------------------------------------------------------------------
+   View tabs
+   --------------------------------------------------------------------------- */
+
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--border);
+  background: #fff;
+}
+
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.view-tab svg,
+.primary-btn svg,
+.inline-action svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.view-tab:hover {
+  color: var(--text);
+}
+
+.view-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.view-tab:focus-visible,
+.preset:focus-visible,
+.primary-btn:focus-visible,
+.inline-action:focus-visible {
+  outline: 3px solid rgba(13, 110, 253, 0.25);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Sales analytics
+   --------------------------------------------------------------------------- */
+
+.sales-panel {
+  flex: 1;
+  padding: 22px 24px 28px;
+  background: #f9faff;
+  overflow: auto;
+}
+
+.sales-panel[hidden],
+.chat-panel[hidden] {
+  display: none;
+}
+
+.sales-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.range-presets {
+  display: inline-flex;
+  flex-wrap: wrap;
+  padding: 4px;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.preset {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.preset:hover {
+  color: var(--text);
+  background: #f3f7ff;
+}
+
+.preset.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 12px;
+  background: var(--success);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(22, 139, 94, 0.22);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(22, 139, 94, 0.26);
+}
+
+.primary-btn:disabled {
+  opacity: 0.65;
+  cursor: progress;
+  transform: none;
+}
+
+.custom-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.custom-range[hidden] {
+  display: none;
+}
+
+.custom-range label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.custom-range input {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--text);
+}
+
+.custom-range .secondary-btn {
+  padding: 10px 16px;
+}
+
+.period-label {
+  margin: 16px 0 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sales-error {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #f5c2c7;
+  border-radius: 12px;
+  background: #fdf2f3;
+  color: #9f1d2a;
+  font-size: 14px;
+}
+
+.sales-content.loading .kpi-value,
+.sales-content.loading .product-list,
+.sales-content.loading .comparison {
+  opacity: 0.45;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.kpi-card,
+.card {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+}
+
+/* Same top border on every card so values line up; only the accent card colors it. */
+.kpi-card {
+  border-top: 3px solid transparent;
+}
+
+.kpi-card.accent {
+  border-top-color: var(--primary);
+}
+
+.kpi-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kpi-value {
+  margin: 8px 0 6px;
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.2s ease;
+}
+
+.kpi-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.delta.up {
+  background: rgba(22, 139, 94, 0.12);
+  color: var(--success);
+}
+
+.delta.down {
+  background: rgba(200, 35, 51, 0.1);
+  color: #b4232f;
+}
+
+.delta.neutral {
+  padding-left: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.sales-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.card-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transition: opacity 0.2s ease;
+}
+
+.product-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 6px;
+}
+
+.product-rank {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--panel-alt);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.product-name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.product-count {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bar-track {
+  grid-column: 2 / 4;
+  height: 8px;
+  border-radius: 999px;
+  background: #eef2fb;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary) 0%, #5b9dff 100%);
+  transition: width 0.4s ease;
+}
+
+.comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  transition: opacity 0.2s ease;
+}
+
+.compare-metric h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.compare-row .bar-track {
+  grid-column: auto;
+}
+
+.compare-row.previous .bar-fill {
+  background: #c3cde0;
+}
+
+.compare-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.empty-state {
+  margin: 6px 0 0;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Action row the chat adds under a sales answer. */
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -6px 0 0 4px;
+}
+
+.inline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inline-action:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.inline-action.excel {
+  border-color: rgba(22, 139, 94, 0.35);
+  color: var(--success);
+}
+
+.inline-action.excel:hover {
+  background: rgba(22, 139, 94, 0.08);
+}
+
+.inline-action:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (max-width: 860px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sales-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 640px) {
+  body {
+    padding: 0;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    border-radius: 0;
+  }
+
   .topbar {
+    flex-wrap: wrap;
     padding: 18px 16px;
+  }
+
+  .view-tabs {
+    padding: 0 8px;
   }
 
   .chat-panel {
     padding: 12px 12px 0;
+  }
+
+  .sales-panel {
+    padding: 16px;
+  }
+
+  .sales-toolbar .primary-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .bubble,
