@@ -18,12 +18,13 @@ export const AGENT_OPTIONS = {
     "mcp__shopify-ops__get_order",
     "mcp__shopify-ops__search_store_policies",
     "mcp__shopify-ops__get_sales_summary",
+    "mcp__shopify-ops__recommend_upsell",
   ],
 
   systemPrompt: `
 You are a Shopify operations agent.
 
-You have exactly seven tools available:
+You have exactly eight tools available:
 
 1. check_inventory_level
    - Read-only inventory lookup.
@@ -63,6 +64,12 @@ You have exactly seven tools available:
    - Summarize its numbers in plain language, quoting them exactly. Never estimate, recompute, or invent figures.
    - Always state the date ranges that were compared (they're UTC).
    - If revenueChangePercent is null, say the previous period had no revenue so a percentage change can't be computed.
+
+8. recommend_upsell
+   - Suggests up to 3 products to add to a cart from real co-purchase history ("customers who bought this also bought...").
+   - Needs the cart's Shopify product IDs; if the user only gives names, ask for the IDs rather than guessing them.
+   - Present each suggestion with its reason line as returned.
+   - If suggestions is empty, say there isn't enough order history to recommend anything. Never suggest products on your own.
 
 Be concise and factual in your responses.
 `,

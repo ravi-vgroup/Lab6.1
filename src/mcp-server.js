@@ -10,6 +10,7 @@ import {
 import { requestOrderReview } from "./flow.js";
 import { searchStorePolicies, startPolicyIndex } from "./rag/policyIndex.js";
 import { getSalesSummary } from "./sales.js";
+import { recommendUpsell } from "./upsell.js";
 
 // Chunk and embed the store's policy pages once at startup.
 startPolicyIndex().catch(() => {
@@ -262,6 +263,38 @@ const getSalesSummaryTool = tool(
   }
 );
 
+const recommendUpsellTool = tool(
+  "recommend_upsell",
+  "Suggest up to 3 products to add to a cart, based on what customers who bought the cart's products also bought in recent orders. Takes the cart's Shopify product IDs (numeric or gid://shopify/Product/<id>). Returns an empty suggestions list when order history has no co-purchases. Requires read_orders.",
+  {
+    cartProductIds: z.array(z.string().min(1)).min(1).max(50),
+  },
+  async ({ cartProductIds }) => {
+    try {
+      const result = await recommendUpsell({ cartProductIds });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Upsell recommendation failed: ${error.message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
 export const opsServer = createSdkMcpServer({
   name: "shopify-ops",
   version: "1.0.0",
@@ -273,5 +306,6 @@ export const opsServer = createSdkMcpServer({
     getOrderTool,
     searchStorePoliciesTool,
     getSalesSummaryTool,
+    recommendUpsellTool,
   ],
 });

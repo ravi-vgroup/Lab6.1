@@ -31,6 +31,14 @@ Sales analytics
 - The web UI has a **Sales analytics** tab (deep link: `/#sales`) with date presets, KPI cards, top products and a current-vs-previous comparison, plus a **Download Excel** button. After the agent answers a sales question, the chat also offers "Download Excel" for that exact range.
 - `GET /api/sales/summary` (Bearer token) and `GET /api/sales/export` (Bearer or `?token=`, because the Admin iframe opens the file as a plain link) take `days` or `startDate`+`endDate`. The export is an .xlsx with Summary, Top products, Orders and Previous period orders sheets, written by the dependency-free `src/xlsx.js`.
 
+Upsell recommendations
+
+- `recommend_upsell` takes the cart's product IDs (numeric or `gid://shopify/Product/<id>`), fetches up to 1,000 recent non-cancelled orders via the Admin API, and passes their line items to `scoreUpsellCandidates` in `src/upsell.js`.
+- `scoreUpsellCandidates(pastOrders, cartProductIds)` is pure: for each order containing a cart product, every other product in it scores one co-occurrence (once per order); cart products are never candidates; results are sorted by count. The tool returns the top 3 with a "Customers who bought X also bought Y" reason.
+- No co-purchase history means an empty list and an explanation — never a guessed product.
+- Scopes: only order line items are queried (`read_orders`, plus product access for the line-item product reference). No customer fields are read, so `read_customers` is not actually used by this implementation.
+- `test/upsell.test.js` covers it with plain arrays, no order data or network.
+
 Notes
 
 - Shopify admin auth is valid in two ways: either a direct `SHOPIFY_ACCESS_TOKEN` (common for custom/private apps), or a `SHOPIFY_AUTH_CODE` exchange using `SHOPIFY_CLIENT_ID` + `SHOPIFY_CLIENT_SECRET`.
