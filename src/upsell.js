@@ -1,4 +1,5 @@
 import { shopifyGraphQL } from "./shopify.js";
+import { pickProductMatch } from "./tools.js";
 
 const PAGE_SIZE = 250;
 const MAX_PAGES = 4;
@@ -97,21 +98,55 @@ async function fetchRecentOrders() {
   return orders;
 }
 
+// Resolve each cart entry (a product ID or a product name) to { productId, title }.
+async function resolveCart(cartProducts) {
+  const ids = [];
+  const names = [];
+  for (const entry of cartProducts) {
+    const id = normalizeProductId(entry);
+    if (id) ids.push(id);
+    else names.push(String(entry).trim());
+  }
+
+  const resolved = [];
+
+  if (ids.length) {
+    const data = await shopifyGraphQL(
+      `query CartProducts($ids: [ID!]!) { nodes(ids: $ids) { ... on Product { id title } } }`,
+      { ids },
+    );
+    const found = new Map(data.nodes.filter(Boolean).map((product) => [product.id, product.title]));
+    const missing = ids.filter((id) => !found.has(id));
+    if (missing.length) {
+      throw new Error(`No product found with ID ${missing.map((id) => id.split("/").pop()).join(", ")}.`);
+    }
+    for (const id of ids) resolved.push({ productId: id, title: found.get(id) });
+  }
+
+  for (const name of names) {
+    const data = await shopifyGraphQL(
+      `query CartProductByName($query: String!) { products(first: 50, query: $query) { nodes { id title } } }`,
+      { query: name },
+    );
+    const product = pickProductMatch(data.products.nodes, name);
+    resolved.push({ productId: product.id, title: product.title });
+  }
+
+  // De-duplicate while keeping order.
+  return [...new Map(resolved.map((item) => [item.productId, item])).values()];
+}
+
 /**
  * Fetch recent order history, score co-purchases for the cart, and return the
  * top 3 suggestions with a one-line reason each. An empty list means no history
  * supports a recommendation; never fill it with a guess.
  */
-export async function recommendUpsell({ cartProductIds }) {
-  const cart = cartProductIds.map((id) => ({ input: id, productId: normalizeProductId(id) }));
-  const invalid = cart.filter((entry) => !entry.productId).map((entry) => entry.input);
-  if (invalid.length) {
-    throw new Error(`Not a Shopify product ID: ${invalid.join(", ")}. Use numeric IDs or gid://shopify/Product/<id>.`);
-  }
-
-  const orders = await fetchRecentOrders();
-  const cartIds = [...new Set(cart.map((entry) => entry.productId))];
+export async function recommendUpsell({ cartProducts }) {
+  const [cart, orders] = await Promise.all([resolveCart(cartProducts), fetchRecentOrders()]);
+  const cartIds = cart.map((item) => item.productId);
   const scored = scoreUpsellCandidates(orders, cartIds);
+
+  const containing = (productId) => orders.filter((order) => order.lineItems.some((item) => item.productId === productId)).length;
   const ordersWithCartItems = orders.filter((order) => order.lineItems.some((item) => cartIds.includes(item.productId))).length;
 
   const suggestions = scored.slice(0, MAX_SUGGESTIONS).map((candidate) => ({
@@ -121,18 +156,20 @@ export async function recommendUpsell({ cartProductIds }) {
     reason: upsellReason(candidate),
   }));
 
+  let message;
+  if (suggestions.length === 0) {
+    const names = joinTitles(cart.map((item) => item.title));
+    message =
+      ordersWithCartItems === 0
+        ? `${names} ${cart.length === 1 ? "hasn't" : "haven't"} been ordered in the last ${orders.length} orders, so there is no co-purchase history to recommend from.`
+        : `${names} appeared in ${ordersWithCartItems} of the last ${orders.length} orders, but always on ${ordersWithCartItems === 1 ? "its" : "their"} own, so nothing has been bought alongside ${cart.length === 1 ? "it" : "them"} yet.`;
+  }
+
   return {
-    cartProductIds: cartIds,
+    cart: cart.map((item) => ({ ...item, ordersContaining: containing(item.productId) })),
     ordersAnalyzed: orders.length,
     ordersContainingCartItems: ordersWithCartItems,
     suggestions,
-    ...(suggestions.length === 0
-      ? {
-          message:
-            ordersWithCartItems === 0
-              ? "No recent orders contain these cart products, so there is no co-purchase history to recommend from."
-              : "Past orders with these cart products contained no other products, so there is nothing to recommend.",
-        }
-      : {}),
+    ...(message ? { message } : {}),
   };
 }

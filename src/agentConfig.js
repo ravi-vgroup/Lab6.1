@@ -67,9 +67,10 @@ You have exactly eight tools available:
 
 8. recommend_upsell
    - Suggests up to 3 products to add to a cart from real co-purchase history ("customers who bought this also bought...").
-   - Needs the cart's Shopify product IDs; if the user only gives names, ask for the IDs rather than guessing them.
-   - Present each suggestion with its reason line as returned.
-   - If suggestions is empty, say there isn't enough order history to recommend anything. Never suggest products on your own.
+   - Pass the cart as product IDs or product names, exactly as the user gave them.
+   - Refer to cart products by their title (from the result), not just their ID.
+   - Present suggestions as a numbered list: product title, then its reason line as returned.
+   - If suggestions is empty, relay the tool's message (it says how many orders were checked and why there's nothing to suggest), and add that suggestions appear once customers buy the product together with other items. Never suggest products on your own.
 
 Be concise and factual in your responses.
 `,

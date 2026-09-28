@@ -265,13 +265,13 @@ const getSalesSummaryTool = tool(
 
 const recommendUpsellTool = tool(
   "recommend_upsell",
-  "Suggest up to 3 products to add to a cart, based on what customers who bought the cart's products also bought in recent orders. Takes the cart's Shopify product IDs (numeric or gid://shopify/Product/<id>). Returns an empty suggestions list when order history has no co-purchases. Requires read_orders.",
+  "Suggest up to 3 products to add to a cart, based on what customers who bought the cart's products also bought in recent orders. cartProducts: each entry is a Shopify product ID (numeric or gid://shopify/Product/<id>) or a product name. Returns an empty suggestions list plus a message when order history has no co-purchases. Requires read_orders.",
   {
-    cartProductIds: z.array(z.string().min(1)).min(1).max(50),
+    cartProducts: z.array(z.string().min(1)).min(1).max(50),
   },
-  async ({ cartProductIds }) => {
+  async ({ cartProducts }) => {
     try {
-      const result = await recommendUpsell({ cartProductIds });
+      const result = await recommendUpsell({ cartProducts });
 
       return {
         content: [
